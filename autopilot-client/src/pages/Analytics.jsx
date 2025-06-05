@@ -70,6 +70,7 @@ const Analytics = () => {
       })) : [];
       setMemberReliabilityData(formattedMemberData);
 
+
     } catch (err) {
       setError('Failed to load analytics data.');
       console.error(err);

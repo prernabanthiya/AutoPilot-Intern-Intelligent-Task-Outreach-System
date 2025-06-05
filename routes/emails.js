@@ -12,27 +12,33 @@ router.post('/send', async (req, res) => {
   }
 
   let recipients = [];
+  let recipientMemberIds = []; // Array to store member IDs for logging
 
   try {
     if (memberId) {
       // Sending to a single member
-      const memberResult = await db.query('SELECT email FROM members WHERE id = $1', [memberId]);
+      const memberResult = await db.query('SELECT id, email FROM members WHERE id = $1', [memberId]);
       if (memberResult.rows.length === 0) {
         return res.status(404).json({ error: 'Member not found' });
       }
       recipients = [memberResult.rows[0].email];
+      recipientMemberIds = [memberResult.rows[0].id]; // Store member ID for logging
+
     } else if (groupId) {
       // Sending to a group
-      const groupResult = await db.query('SELECT member_ids FROM groups WHERE id = $1', [groupId]);
-      if (groupResult.rows.length === 0) {
-        return res.status(404).json({ error: 'Group not found' });
-      }
-      const memberIds = groupResult.rows[0].member_ids || [];
+      // Fetch member IDs from the group_members linking table
+      const groupMembersResult = await db.query('SELECT member_id FROM group_members WHERE group_id = $1', [groupId]);
+      const memberIds = groupMembersResult.rows.map(row => row.member_id);
+
       if (memberIds.length === 0) {
-          return res.status(400).json({ error: 'Group has no members' });
+        return res.status(400).json({ error: 'Group has no members' });
       }
-      const membersResult = await db.query('SELECT email FROM members WHERE id = ANY($1::uuid[])', [memberIds]);
+
+      // Fetch emails for these member IDs
+      const membersResult = await db.query('SELECT id, email FROM members WHERE id = ANY($1)', [memberIds]);
       recipients = membersResult.rows.map(row => row.email);
+      recipientMemberIds = membersResult.rows.map(row => row.id); // Store member IDs for logging
+
     } else {
       return res.status(400).json({ error: 'Please provide a memberId or groupId' });
     }
@@ -41,9 +47,8 @@ router.post('/send', async (req, res) => {
         return res.status(400).json({ error: 'No valid recipients found' });
     }
 
-    // Send the email using the email service
-    // The email service will handle logging if a taskId is provided (though not required for general emails)
-    await sendEmail({ to: recipients, subject, body });
+    // Send the email using the email service, passing memberId(s) for logging
+    await sendEmail({ to: recipients, subject, body, memberId: recipientMemberIds });
 
     res.status(200).json({ message: 'Email(s) sent successfully' });
 

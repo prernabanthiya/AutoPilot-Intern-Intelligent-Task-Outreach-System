@@ -72,12 +72,11 @@ router.get('/analytics/completion-daily', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
-        DATE(deadline) as date,
-        COUNT(*) FILTER (WHERE status = 'Completed') as completed,
-        COUNT(*) FILTER (WHERE status != 'Completed') as pending
+        COALESCE(DATE(deadline), DATE(created_at)) as date,
+        COUNT(*) FILTER (WHERE status = 'done') as completed,
+        COUNT(*) FILTER (WHERE status IN ('pending', 'in progress', 'not done')) as pending
       FROM tasks
-      WHERE deadline IS NOT NULL
-      GROUP BY DATE(deadline)
+      GROUP BY COALESCE(DATE(deadline), DATE(created_at))
       ORDER BY date;
     `);
     res.json(result.rows);

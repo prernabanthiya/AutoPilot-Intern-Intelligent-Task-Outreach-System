@@ -14,15 +14,16 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * Send an email using nodemailer
- * @param {string} to - Recipient email address
- * @param {string} subject - Email subject
- * @param {string} body - Email body
- * @param {number|null} taskId - Optional task ID for logging
- * @param {number|null} memberId - Optional member ID for logging
- * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
+ * Send an email using nodemailer and log it.
+ * @param {object} params - Email parameters
+ * @param {string|string[]} params.to - Recipient email address(es)
+ * @param {string} params.subject - Email subject
+ * @param {string} params.body - Email body
+ * @param {UUID|UUID[]} [params.memberId] - Optional member ID(s) for logging (UUID)
+ * @param {UUID|null} [params.taskId=null] - Optional task ID for logging (UUID)
+ * @returns {Promise<object>}
  */
-const sendEmail = async ({ to, subject, body, taskId = null }) => {
+const sendEmail = async ({ to, subject, body, memberId = null, taskId = null }) => {
   if (!to || !subject || !body) {
     throw new Error('To, subject, and body are required');
   }
@@ -39,20 +40,20 @@ const sendEmail = async ({ to, subject, body, taskId = null }) => {
     const info = await transporter.sendMail(mailOptions);
     console.log('Email sent: %s', info.messageId);
 
-    // Log the email in the database if taskId is provided
-    if (taskId) {
-      const query = 'INSERT INTO email_logs (member_id, task_id, subject, sent_at, status) VALUES ($1, $2, $3, NOW(), $4)';
-      // We need the actual member_id(s) here. This service might need to accept member_id(s) as well.
-      // For now, let's assume 'to' is a single email or comma-separated string and we can find the member_id.
-      // A more robust solution would pass member_id(s) from the route handler.
-      const memberEmails = Array.isArray(to) ? to : [to];
-      for (const email of memberEmails) {
-        const memberQuery = 'SELECT id FROM members WHERE email = $1';
-        const memberResult = await db.query(memberQuery, [email]);
-        if (memberResult.rows.length > 0) {
-          await db.query(query, [memberResult.rows[0].id, taskId, subject, 'sent']);
+    // Log the email(s) in the database
+    const memberIdsToLog = Array.isArray(memberId) ? memberId : (memberId ? [memberId] : []);
+
+    if (memberIdsToLog.length > 0) {
+        const query = 'INSERT INTO email_logs (member_id, task_id, subject, sent_at, status) VALUES ($1, $2, $3, NOW(), $4)';
+        for (const id of memberIdsToLog) {
+             // Ensure the member_id is a valid UUID if necessary, depending on your DB schema
+             // For now, assuming the passed memberId(s) are correct
+            await db.query(query, [id, taskId, subject, 'sent']);
         }
-      }
+    } else if (taskId) {
+        // Fallback logging if only taskId is provided (less common for general emails)
+         const query = 'INSERT INTO email_logs (task_id, subject, sent_at, status) VALUES ($1, $2, NOW(), $3)';
+         await db.query(query, [taskId, subject, 'sent']);
     }
 
     return info;
@@ -62,6 +63,4 @@ const sendEmail = async ({ to, subject, body, taskId = null }) => {
   }
 };
 
-module.exports = {
-  sendEmail
-}; 
+module.exports = { sendEmail }; 

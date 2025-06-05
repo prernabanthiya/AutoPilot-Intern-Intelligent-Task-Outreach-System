@@ -114,7 +114,7 @@ const Dashboard = () => {
         }
 
          if (Array.isArray(emailRes.data)) {
-            const totalSent = emailRes.data.reduce((sum, day) => sum + day.sent, 0);
+            const totalSent = emailRes.data.reduce((sum, day) => sum + parseInt(day.sent_count, 10), 0);
             setEmailsSent(totalSent);
          }
 

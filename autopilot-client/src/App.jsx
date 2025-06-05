@@ -4,7 +4,6 @@ import { ThemeProvider, createTheme } from '@mui/material';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Members from './pages/Members';
-import EmailTracking from './pages/EmailTracking';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import SendEmail from './pages/SendEmail';
@@ -50,7 +49,6 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/members" element={<Members />} />
-            <Route path="/email-tracking" element={<EmailTracking />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/send-email" element={<SendEmail />} />

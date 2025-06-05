@@ -9,6 +9,8 @@ import {
   ListItemText,
   Typography,
   styled,
+  ListItemButton,
+  useTheme,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -17,6 +19,7 @@ import {
   Analytics as AnalyticsIcon,
   Settings as SettingsIcon,
 } from '@mui/icons-material';
+import { NavLink } from 'react-router-dom';
 
 const drawerWidth = 240;
 
@@ -43,7 +46,6 @@ const StyledListItem = styled(ListItem)(({ active }) => ({
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'Members', icon: <PeopleIcon />, path: '/members' },
-  { text: 'Email Tracking', icon: <EmailIcon />, path: '/email-tracking' },
   { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
   { text: 'Send Email', icon: <EmailIcon />, path: '/send-email' },
@@ -51,6 +53,7 @@ const menuItems = [
 
 const Sidebar = () => {
   const location = useLocation();
+  const theme = useTheme();
 
   return (
     <StyledDrawer variant="permanent">
@@ -64,7 +67,13 @@ const Sidebar = () => {
           <Link
             to={item.path}
             key={item.text}
-            style={{ textDecoration: 'none', color: 'inherit' }}
+            style={{
+              textDecoration: 'none',
+              color: 'inherit',
+              '&.active': {
+                bgcolor: theme.palette.action.selected,
+              },
+            }}
           >
             <StyledListItem
               button

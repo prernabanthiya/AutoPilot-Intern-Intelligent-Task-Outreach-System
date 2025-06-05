@@ -26,9 +26,11 @@ router.post('/', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT email_logs.*, tasks.description
+      SELECT
+        email_logs.*,
+        tasks.description AS task_description
       FROM email_logs
-      JOIN tasks ON email_logs.task_id = tasks.id
+      LEFT JOIN tasks ON email_logs.task_id = tasks.id
       ORDER BY sent_at DESC
     `);
     res.json(result.rows);
