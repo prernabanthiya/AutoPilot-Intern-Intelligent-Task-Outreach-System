@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import api from '../utils/api';
 import {
   Box,
   Typography,
@@ -36,54 +37,59 @@ const Analytics = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Fetch analytics data from backend
+  // Fetch analytics data from backend and ML predictions from Flask API
   const fetchAnalyticsData = async () => {
     setLoading(true);
     setError('');
     try {
-      const [taskRes, sentEmailsRes, repliedEmailsRes, memberRes, mlPredictionsRes] = await Promise.all([
-        axios.get('/api/tasks/analytics/completion-daily'),
-        axios.get('/api/email-logs/analytics/sent-daily'),
-        axios.get('/api/email-logs/analytics/replies-daily'),
-        axios.get('/api/members/analytics/reliability'),
-        axios.get('/api/ml/predictions'),
+      // Wrap API calls to log individual outcomes
+      const [taskRes, sentEmailsRes, repliedEmailsRes, memberRes] = await Promise.all([
+        api.get('/api/tasks/analytics/completion-daily').catch(err => { console.error('Task Completion API Error:', err); return null; }),
+        api.get('/api/email-logs/analytics/sent-daily').catch(err => { console.error('Emails Sent API Error:', err); return null; }),
+        api.get('/api/email-logs/analytics/replies-daily').catch(err => { console.error('Email Replies API Error:', err); return null; }),
+        api.get('/api/members/analytics/reliability').catch(err => { console.error('Member Reliability API Error:', err); return null; }),
       ]);
 
+      console.log('API Responses:', { taskRes, sentEmailsRes, repliedEmailsRes, memberRes }); // Log all responses
+
+      // Fetch ML predictions separately from the Flask API
+      const mlPredictionsRes = await axios.get('http://localhost:5001/predictions').catch(err => { console.error('ML Predictions API Error:', err); return null; });
+      console.log('ML Predictions Response:', mlPredictionsRes);
+
       // Format Task Completion Data
-      const formattedTaskData = Array.isArray(taskRes.data) ? taskRes.data.map(item => ({
-        name: item.date, // Or format date nicely
+      const formattedTaskData = Array.isArray(taskRes?.data) ? taskRes.data.map(item => ({
+        name: new Date(item.date).toISOString().split('T')[0],
         completed: parseInt(item.completed, 10),
         pending: parseInt(item.pending, 10),
       })) : [];
       setTaskCompletionData(formattedTaskData);
 
       // Format Email Engagement Data
-      // Merge sent and replied data by date
-      const sentEmailsMap = new Map(Array.isArray(sentEmailsRes.data) ? sentEmailsRes.data.map(item => [item.date, parseInt(item.sent_count, 10)]) : []);
-      const repliedEmailsMap = new Map(Array.isArray(repliedEmailsRes.data) ? repliedEmailsRes.data.map(item => [item.date, parseInt(item.replied_count, 10) || 0]) : []);
+      const sentEmailsMap = new Map(Array.isArray(sentEmailsRes?.data) ? sentEmailsRes.data.map(item => [item.date, parseInt(item.sent_count, 10)]) : []);
+      const repliedEmailsMap = new Map(Array.isArray(repliedEmailsRes?.data) ? repliedEmailsRes.data.map(item => [item.date, parseInt(item.replied_count, 10) || 0]) : []);
 
       const emailDates = Array.from(new Set([...sentEmailsMap.keys(), ...repliedEmailsMap.keys()])).sort();
 
       const formattedEmailData = emailDates.map(date => ({
-        name: date, // Or format date nicely
+        name: new Date(date).toISOString().split('T')[0],
         sent: sentEmailsMap.get(date) || 0,
         replied: repliedEmailsMap.get(date) || 0,
       }));
       setEmailResponseData(formattedEmailData);
 
       // Format Member Reliability Data
-      const formattedMemberData = Array.isArray(memberRes.data) ? memberRes.data.map(item => ({
+      const formattedMemberData = Array.isArray(memberRes?.data) ? memberRes.data.map(item => ({
         name: item.name, // Or member identifier
         completionRate: parseFloat(item.completion_rate).toFixed(1),
       })) : [];
       setMemberReliabilityData(formattedMemberData);
 
       // Set ML Predictions
-      setMlPredictions(Array.isArray(mlPredictionsRes.data) ? mlPredictionsRes.data : []);
+      setMlPredictions(Array.isArray(mlPredictionsRes?.data) ? mlPredictionsRes.data : []);
 
     } catch (err) {
       setError('Failed to load analytics data.');
-      console.error(err);
+      console.error('Fetch Analytics Data Error:', err);
     }
     setLoading(false);
   };

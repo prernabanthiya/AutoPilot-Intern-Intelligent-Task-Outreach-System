@@ -59,6 +59,7 @@ router.delete('/:id', async (req, res) => {
 
 // Get member reliability (task completion rate per member)
 router.get('/analytics/reliability', async (req, res) => {
+  console.log('Member Reliability endpoint hit.');
   try {
     const result = await pool.query(`
       SELECT
@@ -66,10 +67,10 @@ router.get('/analytics/reliability', async (req, res) => {
         m.name,
         m.email,
         COUNT(t.id) as total_tasks,
-        COUNT(t.id) FILTER (WHERE t.status = 'Completed') as completed_tasks,
+        COUNT(t.id) FILTER (WHERE t.status = 'done') as completed_tasks,
         CASE
           WHEN COUNT(t.id) = 0 THEN 0
-          ELSE (COUNT(t.id) FILTER (WHERE t.status = 'Completed')) * 100.0 / COUNT(t.id)
+          ELSE (COUNT(t.id) FILTER (WHERE t.status = 'done')) * 100.0 / COUNT(t.id)
         END as completion_rate
       FROM members m
       LEFT JOIN tasks t ON m.id = t.member_id
