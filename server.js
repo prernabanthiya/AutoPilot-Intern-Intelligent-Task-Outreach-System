@@ -8,6 +8,7 @@ const emailLogRoutes = require('./routes/emailLogs');
 const emailRoutes = require('./routes/emails');
 const emailTemplateRoutes = require('./routes/emailTemplates');
 const groupRoutes = require('./routes/groups');
+const mlRoutes = require('./routes/ml');
 
 const pool = require('./db');
 
@@ -29,6 +30,7 @@ app.use('/api/email-logs', emailLogRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/email-templates', emailTemplateRoutes);
 app.use('/api/groups', groupRoutes);
+app.use('/api/ml', mlRoutes);
 
 app.get('/', (req, res) => res.send('AutoPilot Intern API Running'));
 

@@ -51,6 +51,7 @@ router.get('/analytics/sent-daily', async (req, res) => {
       GROUP BY DATE(sent_at)
       ORDER BY date;
     `);
+    console.log('Email Logs Sent Daily Analytics Data:', result.rows);
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching daily sent email count:', err.message);
@@ -63,17 +64,32 @@ router.get('/analytics/sent-daily', async (req, res) => {
 // You might need to adjust the query based on your actual database schema and email processing logic.
 router.get('/analytics/replies-daily', async (req, res) => {
   try {
-    // TODO: Write the actual query to count replies per day based on your schema
     const result = await pool.query(`
       SELECT
-        DATE(received_at) as date, -- Assuming replies have a received_at timestamp
+        DATE(received_at) as date,
+        COUNT(*) as replied_count,
+        COUNT(*) FILTER (WHERE reply_classification = 'Done') as done_count,
+        COUNT(*) FILTER (WHERE reply_classification != 'Done') as not_done_count -- Assuming other classifications mean not done
+      FROM replies
+      WHERE received_at IS NOT NULL -- Only count replies with a received timestamp
+      GROUP BY DATE(received_at), reply_classification -- Group by date and classification
+      -- Note: This query groups by classification. You might want to aggregate differently 
+      -- depending on how you want to visualize replies (e.g., total replies per day).
+      -- The current frontend Email Engagement chart expects total sent vs total replied per day.
+      -- Let's adjust this query to provide total replied per day to match the frontend chart structure.
+    `);
+    // Re-run the query to get total replies per day to match frontend expectation
+    const totalRepliesResult = await pool.query(`
+      SELECT
+        DATE(received_at) as date,
         COUNT(*) as replied_count
-      FROM email_logs -- Or a separate replies table if you have one
-      WHERE is_reply = TRUE -- Assuming you have an 'is_reply' flag
+      FROM replies
+      WHERE received_at IS NOT NULL
       GROUP BY DATE(received_at)
       ORDER BY date;
     `);
-    res.json(result.rows);
+    console.log('Email Logs Replies Daily Analytics Data:', totalRepliesResult.rows);
+    res.json(totalRepliesResult.rows);
   } catch (err) {
     console.error('Error fetching daily reply count:', err.message);
     res.status(500).send('Server error');

@@ -60,4 +60,18 @@ router.post('/send', async (req, res) => {
   }
 });
 
+// POST endpoint to receive inbound emails
+router.post('/inbound', async (req, res) => {
+  console.log('Received inbound email data:', req.body);
+
+  // TODO: Implement logic here to parse the incoming email data,
+  // identify replies, extract info, link to tasks/members, and save to the replies table.
+  // The structure of req.body will depend on the inbound email service/method used.
+  // You will likely need to parse email headers (like In-Reply-To, References) 
+  // to link replies to sent emails and tasks.
+
+  // For now, just acknowledge receipt
+  res.status(200).json({ message: 'Inbound email data received (processing not yet implemented)' });
+});
+
 module.exports = router; 

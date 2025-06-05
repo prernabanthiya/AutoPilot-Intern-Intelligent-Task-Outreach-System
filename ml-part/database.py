@@ -1,20 +1,20 @@
 import pandas as pd
-import psycopg2
-from psycopg2 import OperationalError, Error
+import sys
+from sqlalchemy import create_engine
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 def create_connection():
     try:
-        conn = psycopg2.connect(
-            host="localhost",       # change if needed
-            database="Autopilot",   # replace with your DB name
-            user="postgres",
-            port=5432,
-            password="prerna"       # replace with your password
-        )
-        print("Connection to PostgreSQL DB successful")
-        return conn
-    except OperationalError as e:
-        print(f"The error '{e}' occurred")
+        # Create SQLAlchemy engine
+        db_url = f"postgresql://{os.getenv('DB_USER', 'postgres')}:{os.getenv('DB_PASSWORD', 'relax123')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', 5432)}/{os.getenv('DB_NAME', 'auto-piolet')}"
+        engine = create_engine(db_url)
+        return engine
+    except Exception as e:
+        print(f"The error '{e}' occurred", file=sys.stderr)
         return None
 
 def fetch_data(conn):
@@ -41,8 +41,8 @@ def fetch_data(conn):
     try:
         df = pd.read_sql(query, conn)
         return df
-    except Error as e:
-        print(f"Error executing query: {e}")
+    except Exception as e:
+        print(f"Error executing query: {e}", file=sys.stderr)
         return None
 
 def main():
@@ -50,11 +50,10 @@ def main():
     if conn:
         df = fetch_data(conn)
         if df is not None:
-            print(df.head())
-        conn.close()
+            print(df.head(), file=sys.stderr)
         return df
     else:
-        print("Connection failed, exiting...")
+        print("Connection failed, exiting...", file=sys.stderr)
         return None
 
 if __name__ == "__main__":

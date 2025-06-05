@@ -76,6 +76,7 @@ router.get('/analytics/reliability', async (req, res) => {
       GROUP BY m.id, m.name, m.email
       ORDER BY completion_rate DESC;
     `);
+    console.log('Member Reliability Analytics Data:', result.rows);
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching member reliability:', err.message);

@@ -79,6 +79,7 @@ router.get('/analytics/completion-daily', async (req, res) => {
       GROUP BY COALESCE(DATE(deadline), DATE(created_at))
       ORDER BY date;
     `);
+    console.log('Task Completion Daily Analytics Data:', result.rows);
     res.json(result.rows);
   } catch (err) {
     console.error(err.message);

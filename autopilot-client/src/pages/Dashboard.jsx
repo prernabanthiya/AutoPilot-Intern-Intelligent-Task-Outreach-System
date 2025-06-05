@@ -10,6 +10,12 @@ import {
   useTheme,
   CircularProgress,
   Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
   Assignment as TaskIcon,
@@ -78,6 +84,7 @@ const Dashboard = () => {
   const [taskCompletionRate, setTaskCompletionRate] = useState('0%');
   const [taskOverviewData, setTaskOverviewData] = useState([]);
   const [emailEngagementData, setEmailEngagementData] = useState([]);
+  const [mlPredictions, setMlPredictions] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -89,8 +96,23 @@ const Dashboard = () => {
         setTaskOverviewData(Array.isArray(taskRes.data) ? taskRes.data : []);
 
         // Fetch daily email engagement data
-        const emailRes = await api.get('/api/email-logs/analytics/sent-daily');
-        setEmailEngagementData(Array.isArray(emailRes.data) ? emailRes.data : []);
+        const [sentEmailsRes, repliedEmailsRes] = await Promise.all([
+          api.get('/api/email-logs/analytics/sent-daily'),
+          api.get('/api/email-logs/analytics/replies-daily'),
+        ]);
+
+        // Merge sent and replied data by date for email engagement chart
+        const sentEmailsMap = new Map(Array.isArray(sentEmailsRes.data) ? sentEmailsRes.data.map(item => [item.date, parseInt(item.sent_count, 10)]) : []);
+        const repliedEmailsMap = new Map(Array.isArray(repliedEmailsRes.data) ? repliedEmailsRes.data.map(item => [item.date, parseInt(item.replied_count, 10) || 0]) : []);
+
+        const emailDates = Array.from(new Set([...sentEmailsMap.keys(), ...repliedEmailsMap.keys()])).sort();
+
+        const formattedEmailData = emailDates.map(date => ({
+          name: date, // Or format date nicely
+          sent: sentEmailsMap.get(date) || 0,
+          replied: repliedEmailsMap.get(date) || 0, // Use 'replied' to match the chart's dataKey
+        }));
+        setEmailEngagementData(formattedEmailData);
 
         // Fetch total members (assuming this endpoint returns an array of members)
         const membersRes = await api.get('/api/members');
@@ -113,11 +135,15 @@ const Dashboard = () => {
              }
         }
 
-         if (Array.isArray(emailRes.data)) {
-            const totalSent = emailRes.data.reduce((sum, day) => sum + parseInt(day.sent_count, 10), 0);
+         // Recalculate total emails sent based on the merged data
+         if (Array.isArray(formattedEmailData)) {
+            const totalSent = formattedEmailData.reduce((sum, day) => sum + day.sent, 0);
             setEmailsSent(totalSent);
          }
 
+        // Fetch ML predictions
+        const mlPredictionsRes = await api.get('/api/ml/predictions');
+        setMlPredictions(Array.isArray(mlPredictionsRes.data) ? mlPredictionsRes.data : []);
 
       } catch (err) {
         setError('Failed to load dashboard data.');
@@ -220,7 +246,7 @@ const Dashboard = () => {
                         />
                         <Line
                           type="monotone"
-                          dataKey="replies"
+                          dataKey="replied"
                           stroke={theme.palette.success.main}
                           name="Replies Received"
                           strokeWidth={3}
@@ -229,6 +255,42 @@ const Dashboard = () => {
                         />
                       </LineChart>
                     </ResponsiveContainer>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12}>
+                  <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: '0 2px 12px rgba(30, 34, 90, 0.08)' }}>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                      Task Completion Predictions
+                    </Typography>
+                    {mlPredictions.length > 0 ? (
+                      <TableContainer component={Paper} elevation={0}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Task ID</TableCell>
+                              <TableCell align="right">Predicted Probability</TableCell>
+                              <TableCell align="right">Actual Completed</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {mlPredictions.map((prediction) => (
+                              <TableRow
+                                key={prediction.task_id}
+                                sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                              >
+                                <TableCell component="th" scope="row">
+                                  {prediction.task_id}
+                                </TableCell>
+                                <TableCell align="right">{(prediction.completion_prob * 100).toFixed(2)}%</TableCell>
+                                <TableCell align="right">{prediction.task_completed === 1 ? 'Yes' : 'No'}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">No ML predictions available.</Typography>
+                    )}
                   </Paper>
                 </Grid>
               </Grid>

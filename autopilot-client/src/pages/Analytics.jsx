@@ -7,7 +7,13 @@ import {
   Grid,
   CircularProgress,
   Alert,
-  useTheme
+  useTheme,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
   BarChart,
@@ -26,6 +32,7 @@ const Analytics = () => {
   const [taskCompletionData, setTaskCompletionData] = useState([]);
   const [emailResponseData, setEmailResponseData] = useState([]);
   const [memberReliabilityData, setMemberReliabilityData] = useState([]);
+  const [mlPredictions, setMlPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -34,11 +41,12 @@ const Analytics = () => {
     setLoading(true);
     setError('');
     try {
-      const [taskRes, sentEmailsRes, repliedEmailsRes, memberRes] = await Promise.all([
+      const [taskRes, sentEmailsRes, repliedEmailsRes, memberRes, mlPredictionsRes] = await Promise.all([
         axios.get('/api/tasks/analytics/completion-daily'),
         axios.get('/api/email-logs/analytics/sent-daily'),
         axios.get('/api/email-logs/analytics/replies-daily'),
         axios.get('/api/members/analytics/reliability'),
+        axios.get('/api/ml/predictions'),
       ]);
 
       // Format Task Completion Data
@@ -70,6 +78,8 @@ const Analytics = () => {
       })) : [];
       setMemberReliabilityData(formattedMemberData);
 
+      // Set ML Predictions
+      setMlPredictions(Array.isArray(mlPredictionsRes.data) ? mlPredictionsRes.data : []);
 
     } catch (err) {
       setError('Failed to load analytics data.');
@@ -148,25 +158,67 @@ const Analytics = () => {
             </Paper>
           </Grid>
 
-          {/* Member Reliability (Example - might need different chart/data) */}
-          <Grid item xs={12}>
-             <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: '0 2px 12px rgba(30, 34, 90, 0.08)' }}>
+          {/* Member Reliability */}
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: '0 2px 12px rgba(30, 34, 90, 0.08)' }}>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
                 Member Reliability (Task Completion Rate)
               </Typography>
-               <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={memberReliabilityData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis domain={[0, 100]} />
                   <Tooltip />
-                  <Bar dataKey="completionRate" fill={theme.palette.info.main} name="Completion Rate (%) " radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="completionRate" fill={theme.palette.info.main} name="Completion Rate (%)" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </Paper>
           </Grid>
 
-          {/* Add more analytics charts as needed */}
+          {/* ML Predictions */}
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: '0 2px 12px rgba(30, 34, 90, 0.08)' }}>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                ML Task Completion Predictions
+              </Typography>
+              {mlPredictions.length > 0 ? (
+                <TableContainer component={Paper} elevation={0}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Task ID</TableCell>
+                        <TableCell align="right">Predicted Probability</TableCell>
+                        <TableCell align="right">Actual Status</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {mlPredictions.map((prediction) => (
+                        <TableRow
+                          key={prediction.task_id}
+                          sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                        >
+                          <TableCell component="th" scope="row">
+                            {prediction.task_id}
+                          </TableCell>
+                          <TableCell align="right">
+                            {(prediction.completion_prob * 100).toFixed(2)}%
+                          </TableCell>
+                          <TableCell align="right">
+                            {prediction.task_completed === 1 ? 'Completed' : 'Pending'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No ML predictions available.
+                </Typography>
+              )}
+            </Paper>
+          </Grid>
         </Grid>
       )}
     </Box>
