@@ -5,6 +5,9 @@ require('dotenv').config();
 const membersRoutes = require('./routes/members');
 const tasksRoutes = require('./routes/tasks');
 const emailLogRoutes = require('./routes/emailLogs');
+const emailRoutes = require('./routes/emails');
+const emailTemplateRoutes = require('./routes/emailTemplates');
+const groupRoutes = require('./routes/groups');
 
 const pool = require('./db');
 
@@ -23,6 +26,9 @@ pool.connect()
 app.use('/api/members', membersRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/email-logs', emailLogRoutes);
+app.use('/api/emails', emailRoutes);
+app.use('/api/email-templates', emailTemplateRoutes);
+app.use('/api/groups', groupRoutes);
 
 app.get('/', (req, res) => res.send('AutoPilot Intern API Running'));
 

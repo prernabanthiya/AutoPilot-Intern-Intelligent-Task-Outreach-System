@@ -1,69 +1,63 @@
-import { useState } from 'react';
-import './App.css';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { ThemeProvider, createTheme } from '@mui/material';
+import Layout from './components/layout/Layout';
+import Dashboard from './pages/Dashboard';
+import Members from './pages/Members';
+import EmailTracking from './pages/EmailTracking';
+import Analytics from './pages/Analytics';
+import Settings from './pages/Settings';
+import SendEmail from './pages/SendEmail';
+
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1a237e',
+    },
+    secondary: {
+      main: '#ed6c02',
+    },
+  },
+  typography: {
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          borderRadius: 8,
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 12,
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        },
+      },
+    },
+  },
+});
 
 function App() {
-  const [entries, setEntries] = useState([]);
-  const [form, setForm] = useState({ name: '', email: '', task: '' });
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const addEntry = () => {
-    if (form.name && form.email && form.task) {
-      setEntries([...entries, form]);
-      setForm({ name: '', email: '', task: '' }); // clear form
-    }
-  };
-
   return (
-    <div className="app-container">
-      <h2>Add Member Task</h2>
-
-      <div className="input-row">
-        <input
-          type="text"
-          name="name"
-          placeholder="Name"
-          value={form.name}
-          onChange={handleChange}
-        />
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={handleChange}
-        />
-        <input
-          type="text"
-          name="task"
-          placeholder="Task"
-          value={form.task}
-          onChange={handleChange}
-        />
-        <button onClick={addEntry}>➕</button>
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Task</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((entry, idx) => (
-            <tr key={idx}>
-              <td>{entry.name}</td>
-              <td>{entry.email}</td>
-              <td>{entry.task}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ThemeProvider theme={theme}>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/members" element={<Members />} />
+            <Route path="/email-tracking" element={<EmailTracking />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/send-email" element={<SendEmail />} />
+          </Routes>
+        </Layout>
+      </Router>
+    </ThemeProvider>
   );
 }
 

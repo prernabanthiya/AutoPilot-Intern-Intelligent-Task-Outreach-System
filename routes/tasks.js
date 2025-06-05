@@ -33,4 +33,58 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Update a task
+router.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { member_id, description, deadline, status } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE tasks SET member_id = $1, description = $2, deadline = $3, status = $4 WHERE id = $5 RETURNING *',
+      [member_id, description, deadline, status, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err.message);
+    res.status(400).json({ error: 'Invalid input' });
+  }
+});
+
+// Delete a task
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('DELETE FROM tasks WHERE id = $1 RETURNING *', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    res.json({ message: 'Task deleted', task: result.rows[0] });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get task completion data aggregated by day (example)
+router.get('/analytics/completion-daily', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        DATE(deadline) as date,
+        COUNT(*) FILTER (WHERE status = 'Completed') as completed,
+        COUNT(*) FILTER (WHERE status != 'Completed') as pending
+      FROM tasks
+      WHERE deadline IS NOT NULL
+      GROUP BY DATE(deadline)
+      ORDER BY date;
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
 module.exports = router;
