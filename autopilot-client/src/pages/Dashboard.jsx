@@ -83,6 +83,7 @@ const Dashboard = () => {
   const [emailsSent, setEmailsSent] = useState(0);
   const [taskCompletionRate, setTaskCompletionRate] = useState('0%');
   const [taskOverviewData, setTaskOverviewData] = useState([]);
+  const [fullTaskList, setFullTaskList] = useState([]);
   const [emailEngagementData, setEmailEngagementData] = useState([]);
   const [mlPredictions, setMlPredictions] = useState([]);
 
@@ -91,7 +92,11 @@ const Dashboard = () => {
       setLoading(true);
       setError('');
       try {
-        // Fetch daily task completion data
+        // Fetch all tasks for the list/table display
+        const allTasksRes = await api.get('/api/tasks');
+        setFullTaskList(Array.isArray(allTasksRes.data) ? allTasksRes.data : []);
+
+        // Fetch daily task completion data for the chart
         const taskRes = await api.get('/api/tasks/analytics/completion-daily');
         setTaskOverviewData(Array.isArray(taskRes.data) ? taskRes.data : []);
 
@@ -119,27 +124,28 @@ const Dashboard = () => {
         const membersArray = Array.isArray(membersRes.data) ? membersRes.data : [];
         setActiveMembers(membersArray.length);
 
-        // TODO: Fetch/Calculate Total Tasks, Total Emails Sent, and Task Completion Rate accurately.
-        // For now, setting placeholders or calculating simply from available data.
+        // TODO: Fetch/Calculate Total Emails Sent, and Task Completion Rate accurately.
+        // For now, Total Tasks will be the count of the full task list.
 
-        // Simple calculation for Total Tasks and Emails Sent from daily data (may not be accurate totals)
-        if (Array.isArray(taskRes.data)) {
-            const totalCompleted = taskRes.data.reduce((sum, day) => sum + parseInt(day.completed, 10), 0);
-            const totalPending = taskRes.data.reduce((sum, day) => sum + parseInt(day.pending, 10), 0);
-            setTotalTasks(totalCompleted + totalPending);
-             // Simple completion rate calculation
-            if (totalCompleted + totalPending > 0) {
-                 setTaskCompletionRate(`${Math.round((totalCompleted / (totalCompleted + totalPending)) * 100)}%`);
-             } else {
-                 setTaskCompletionRate('0%');
-             }
-        }
+        // Set Total Tasks from the full list
+        setTotalTasks(allTasksRes.data.length);
 
          // Recalculate total emails sent based on the merged data
          if (Array.isArray(formattedEmailData)) {
             const totalSent = formattedEmailData.reduce((sum, day) => sum + day.sent, 0);
             setEmailsSent(totalSent);
          }
+
+        // Calculate Task Completion Rate from the full task list
+        if (Array.isArray(allTasksRes.data)) {
+             const completedCount = allTasksRes.data.filter(task => task.status === 'completed').length;
+             const totalCount = allTasksRes.data.length;
+             if (totalCount > 0) {
+                  setTaskCompletionRate(`${Math.round((completedCount / totalCount) * 100)}%`);
+              } else {
+                  setTaskCompletionRate('0%');
+              }
+        }
 
         // Fetch ML predictions
         const mlPredictionsRes = await api.get('/api/ml/predictions');
@@ -210,7 +216,7 @@ const Dashboard = () => {
                 <Grid item xs={12} md={6}>
                   <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: '0 2px 12px rgba(30, 34, 90, 0.08)' }}>
                     <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                      Task Completion Overview
+                      Task Completion Trend Overview (Daily)
                     </Typography>
                     <ResponsiveContainer width="100%" height={300}>
                       <BarChart data={taskOverviewData}>
@@ -227,7 +233,7 @@ const Dashboard = () => {
                 <Grid item xs={12} md={6}>
                   <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: '0 2px 12px rgba(30, 34, 90, 0.08)' }}>
                     <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                      Email Engagement
+                      Email Engagement (Daily)
                     </Typography>
                     <ResponsiveContainer width="100%" height={300}>
                       <LineChart data={emailEngagementData}>
@@ -255,6 +261,50 @@ const Dashboard = () => {
                         />
                       </LineChart>
                     </ResponsiveContainer>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12}>
+                  <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: '0 2px 12px rgba(30, 34, 90, 0.08)' }}>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                      All Tasks
+                    </Typography>
+                    {fullTaskList.length > 0 ? (
+                      <TableContainer component={Paper} elevation={0}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>ID</TableCell>
+                              <TableCell>Member ID</TableCell>
+                              <TableCell>Description</TableCell>
+                              <TableCell>Status</TableCell>
+                              <TableCell>Deadline</TableCell>
+                              <TableCell>Created At</TableCell>
+                              <TableCell>Completed At</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {fullTaskList.map((task) => (
+                              <TableRow
+                                key={task.id}
+                                sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                              >
+                                <TableCell component="th" scope="row">
+                                  {task.id}
+                                </TableCell>
+                                <TableCell>{task.member_id}</TableCell>
+                                <TableCell>{task.description}</TableCell>
+                                <TableCell>{task.status}</TableCell>
+                                <TableCell>{task.deadline ? new Date(task.deadline).toDateString() : 'N/A'}</TableCell>
+                                <TableCell>{task.created_at ? new Date(task.created_at).toLocaleString() : 'N/A'}</TableCell>
+                                <TableCell>{task.completed_at ? new Date(task.completed_at).toLocaleString() : 'N/A'}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">No tasks available.</Typography>
+                    )}
                   </Paper>
                 </Grid>
                 <Grid item xs={12}>
