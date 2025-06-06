@@ -1,45 +1,28 @@
 const express = require('express');
 const router = express.Router();
-const { exec } = require('child_process');
-const path = require('path');
+const axios = require('axios'); // Import axios
 
-// Helper function to get the absolute path to the ml_predictor.py script
-const getPredictorScriptPath = () => {
-  // Use the correct workspace path
-  return path.join(__dirname, '..', 'ml-part', 'ml_predictor.py');
-};
+// GET predictions from the ML model running as a separate service
+router.get('/predictions', async (req, res) => {
+  try {
+    // Make a GET request to the Python ML service
+    const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://localhost:5001'; // Use environment variable or default
+    const response = await axios.get(`${mlServiceUrl}/predictions`);
 
-// GET predictions from the ML model
-router.get('/predictions', (req, res) => {
-  const pythonScript = getPredictorScriptPath();
-  console.log('Attempting to run Python script at:', pythonScript);
+    // Forward the response from the ML service to the frontend
+    res.status(response.status).json(response.data);
 
-  exec(`python "${pythonScript}"`, (error, stdout, stderr) => {
-    // Log any stderr output for debugging
-    if (stderr) {
-      console.log('Python stderr:', stderr);
+  } catch (error) {
+    console.error('Error communicating with ML service:', error.message);
+    // Check if it's an Axios error with a response from the ML service
+    if (error.response) {
+      // Forward the ML service's error response to the frontend
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      // Handle other errors (e.g., network issues, service not running)
+      res.status(500).json({ error: 'Failed to connect to or receive response from ML service' });
     }
-
-    if (error) {
-      console.error(`exec error: ${error}`);
-      return res.status(500).json({ error: 'Failed to get ML predictions', details: error.message });
-    }
-
-    try {
-      // Clean the stdout by removing any non-JSON content
-      const jsonStr = stdout.trim();
-      const predictions = JSON.parse(jsonStr);
-      res.json(predictions);
-    } catch (parseError) {
-      console.error(`JSON parse error: ${parseError}`);
-      console.error(`stdout: ${stdout}`);
-      res.status(500).json({ 
-        error: 'Failed to parse ML predictions output', 
-        details: parseError.message,
-        rawOutput: stdout 
-      });
-    }
-  });
+  }
 });
 
 module.exports = router; 

@@ -12,6 +12,8 @@ const SendEmail = () => {
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [members, setMembers] = useState([]); // State for all members (to populate recipient select)
   const [groups, setGroups] = useState([]); // State for all groups (to populate group select)
+  const [tasks, setTasks] = useState([]); // State for all tasks (to populate task select)
+  const [selectedTask, setSelectedTask] = useState(''); // State for selected task ID
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -20,21 +22,23 @@ const SendEmail = () => {
   const [templateForm, setTemplateForm] = useState({ name: '', subject: '', body: '' });
   const [editTemplateId, setEditTemplateId] = useState(null);
 
-  // Fetch members, groups, and templates on component mount
+  // Fetch members, groups, templates, and tasks on component mount
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError('');
       try {
-        const [membersRes, groupsRes, templatesRes] = await Promise.all([
+        const [membersRes, groupsRes, templatesRes, tasksRes] = await Promise.all([
           api.get('/api/members'),
           api.get('/api/groups'),
           api.get('/api/email-templates'),
+          api.get('/api/tasks'), // Fetch tasks
         ]);
 
         setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
         setGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
         setTemplates(Array.isArray(templatesRes.data) ? templatesRes.data : []);
+        setTasks(Array.isArray(tasksRes.data) ? tasksRes.data : []); // Set tasks
 
       } catch (err) {
         setError('Failed to load data for email sending.');
@@ -95,6 +99,11 @@ const SendEmail = () => {
          return;
     }
 
+    // Include selected task ID in payload if a task is selected
+    if (selectedTask) {
+      payload.taskId = selectedTask;
+    }
+
     try {
       const res = await api.post('/api/emails/send', payload);
       setSuccess(res.data.message || 'Email(s) sent successfully.');
@@ -104,6 +113,7 @@ const SendEmail = () => {
        // setSubject('');
        // setBody('');
        // setSelectedTemplate('');
+       // setSelectedTask(''); // Clear selected task
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to send email(s).');
       console.error('API Error:', err);
@@ -198,51 +208,53 @@ const SendEmail = () => {
                        {/* TODO: Implement multi-select for individual members if needed */}
                       <Select
                         labelId="recipient-label"
-                         // Value should be the selected memberId or the group value string
-                        value={recipients.length > 0 ? recipients[0] : (selectedGroup ? `group-${selectedGroup}` : '')}
-                        label="Select Recipient(s)"
-                         onChange={(e) => {
-                             const value = e.target.value;
-                             const stringValue = String(value);
-                             if (stringValue.startsWith('group-')) {
-                                 setSelectedGroup(stringValue.replace('group-', ''));
-                                 setRecipients([]); // Clear individual recipients if a group is selected
-                             } else if (value === '') {
-                                 setSelectedGroup('');
-                                 setRecipients([]);
-                             }
-                             else {
-                                 setRecipients([value]); // Select individual member
-                                 setSelectedGroup(''); // Clear selected group
-                             }
-                         }}
+                        id="recipient-select"
+                        value={recipients}
+                        onChange={(e) => setRecipients(typeof e.target.value === 'string' ? e.target.value.split(',') : [e.target.value])}
+                        // multiple // Enable if multi-select is desired later
                       >
-                           <MenuItem value=""><em>Select a member or group</em></MenuItem>
-                           <MenuItem disabled>-- Individual Members --</MenuItem>
-                           {members.map(member => (
-                               <MenuItem key={member.id} value={member.id}>{member.name} ({member.email})</MenuItem>
-                           ))}
-                           <MenuItem disabled>-- Groups --</MenuItem>
-                           {groups.map(group => (
-                                <MenuItem key={group.id} value={`group-${group.id}`}>{group.name}</MenuItem>
-                           ))}
+                        {members.map((member) => (
+                          <MenuItem key={member.id} value={member.id}>
+                            {member.name} ({member.email})
+                          </MenuItem>
+                        ))}
                       </Select>
                   </FormControl>
              </Grid>
-
-             {/* Template Selection */}
-            <Grid item xs={12} sm={6}> {/* Adjust grid sizing */}
+             {/* Task Selection */}
+             <Grid item xs={12} sm={6}> {/* Add new grid item for task selection */}
+                <FormControl fullWidth disabled={loading}>
+                    <InputLabel id="task-label">Select Task (Optional)</InputLabel>
+                    <Select
+                      labelId="task-label"
+                      id="task-select"
+                      value={selectedTask}
+                      onChange={(e) => setSelectedTask(e.target.value)}
+                    >
+                      <MenuItem value="">None</MenuItem> {/* Option for no task */}
+                      {tasks.map((task) => (
+                        <MenuItem key={task.id} value={task.id}>
+                          Task ID: {task.id} - {task.description}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                </FormControl>
+             </Grid>
+            {/* Template Selection */}
+            <Grid item xs={12}>
               <FormControl fullWidth disabled={loading}>
-                <InputLabel id="template-label">Select Template</InputLabel>
+                <InputLabel id="template-label">Select Template (Optional)</InputLabel>
                 <Select
                   labelId="template-label"
+                  id="template-select"
                   value={selectedTemplate}
-                  label="Select Template"
                   onChange={handleTemplateChange}
                 >
-                  <MenuItem value=""><em>None</em></MenuItem>
-                  {templates.map(template => (
-                    <MenuItem key={template.id} value={template.id}>{template.name}</MenuItem>
+                  <MenuItem value="">None</MenuItem>
+                  {templates.map((template) => (
+                    <MenuItem key={template.id} value={template.id}>
+                      {template.name}
+                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -251,26 +263,24 @@ const SendEmail = () => {
             {/* Subject */}
             <Grid item xs={12}>
               <TextField
-                label="Subject"
                 fullWidth
+                label="Subject"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                margin="normal"
-                 disabled={loading}
+                disabled={loading}
               />
             </Grid>
 
             {/* Body */}
             <Grid item xs={12}>
               <TextField
-                label="Body"
                 fullWidth
+                label="Body"
                 multiline
                 rows={8}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                margin="normal"
-                 disabled={loading}
+                disabled={loading}
               />
             </Grid>
 
@@ -279,108 +289,112 @@ const SendEmail = () => {
               <Button
                 variant="contained"
                 onClick={handleSendEmail}
-                disabled={loading || (!selectedGroup && recipients.length === 0)}
+                disabled={loading || (!recipients.length && !selectedGroup) || !subject || !body}
+                sx={{
+                  mt: 2,
+                  px: 4,
+                  py: 1.5,
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  textTransform: 'none',
+                  boxShadow: '0 4px 12px rgba(30, 34, 90, 0.2)',
+                  '&:hover': { boxShadow: '0 6px 16px rgba(30, 34, 90, 0.3)' }
+                }}
               >
-                {loading ? <CircularProgress size={24} /> : 'Send Email'}
+                {loading ? <CircularProgress size={24} color="inherit" /> : 'Send Email'}
               </Button>
             </Grid>
           </Grid>
         </Paper>
       ) : (
-        <Paper sx={{ p: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(30, 34, 90, 0.08)' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6">Email Templates</Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenTemplateDialog()}
-            >
-              Add Template
-            </Button>
-          </Box>
-
-          {templates.length > 0 ? (
-            <Grid container spacing={2}>
-              {templates.map((template) => (
-                <Grid item xs={12} key={template.id}>
-                  <Paper sx={{ p: 2, position: 'relative' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        // Email Templates Tab
+        <Box>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenTemplateDialog()}
+            sx={{ mb: 3 }}
+          >
+            Create New Template
+          </Button>
+          <Grid container spacing={2}>
+            {templates.length === 0 ? (
+              <Grid item xs={12}>
+                <Typography>No templates available.</Typography>
+              </Grid>
+            ) : (
+              templates.map((template) => (
+                <Grid item xs={12} sm={6} md={4} key={template.id}>
+                  <Paper sx={{ p: 2, borderRadius: 2, boxShadow: '0 1px 6px rgba(30, 34, 90, 0.05)' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600 }}>{template.name}</Typography>
                       <Box>
-                        <Typography variant="h6">{template.name}</Typography>
-                        <Typography variant="subtitle1" color="text.secondary">
-                          Subject: {template.subject}
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
-                          {template.body}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <IconButton onClick={() => handleOpenTemplateDialog(template)} size="small">
-                          <EditIcon />
+                        <IconButton size="small" onClick={() => handleOpenTemplateDialog(template)}>
+                          <EditIcon fontSize="small" />
                         </IconButton>
-                        <IconButton onClick={() => handleDeleteTemplate(template.id)} size="small" color="error">
-                          <DeleteIcon />
+                        <IconButton size="small" onClick={() => handleDeleteTemplate(template.id)}>
+                          <DeleteIcon fontSize="small" />
                         </IconButton>
                       </Box>
                     </Box>
+                    <Typography variant="body2" color="textSecondary">Subject: {template.subject}</Typography>
+                    {/* Displaying just a snippet of the body */}
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                      {template.body}
+                    </Typography>
                   </Paper>
                 </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Typography variant="body1" sx={{ textAlign: 'center', mt: 4 }}>
-              No templates found. Click "Add Template" to create one.
-            </Typography>
-          )}
-        </Paper>
-      )}
+              ))
+            )}
+          </Grid>
 
-      <Dialog open={templateDialogOpen} onClose={handleCloseTemplateDialog} maxWidth="md" fullWidth>
-        <DialogTitle>{editTemplateId ? 'Edit Template' : 'Add New Template'}</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
+          {/* Template Dialog */}
+          <Dialog open={templateDialogOpen} onClose={handleCloseTemplateDialog} fullWidth maxWidth="sm">
+            <DialogTitle>{editTemplateId ? 'Edit Email Template' : 'Create New Email Template'}</DialogTitle>
+            <DialogContent>
               <TextField
-                label="Template Name"
+                autoFocus
+                margin="dense"
                 name="name"
+                label="Template Name"
+                type="text"
+                fullWidth
+                variant="outlined"
                 value={templateForm.name}
                 onChange={handleTemplateFormChange}
-                fullWidth
-                required
+                sx={{ mb: 2 }}
               />
-            </Grid>
-            <Grid item xs={12}>
               <TextField
-                label="Subject"
+                margin="dense"
                 name="subject"
+                label="Subject"
+                type="text"
+                fullWidth
+                variant="outlined"
                 value={templateForm.subject}
                 onChange={handleTemplateFormChange}
-                fullWidth
-                required
+                sx={{ mb: 2 }}
               />
-            </Grid>
-            <Grid item xs={12}>
               <TextField
-                label="Body"
+                margin="dense"
                 name="body"
-                value={templateForm.body}
-                onChange={handleTemplateFormChange}
+                label="Body"
+                type="text"
                 fullWidth
                 multiline
                 rows={6}
-                required
-                helperText="Use {Name} and {Task description} as placeholders"
+                variant="outlined"
+                value={templateForm.body}
+                onChange={handleTemplateFormChange}
               />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseTemplateDialog}>Cancel</Button>
-          <Button onClick={handleSaveTemplate} variant="contained" disabled={loading}>
-            {editTemplateId ? 'Save Changes' : 'Add Template'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseTemplateDialog} color="secondary">Cancel</Button>
+              <Button onClick={handleSaveTemplate} color="primary" disabled={loading}>{editTemplateId ? 'Save Changes' : 'Create'}</Button>
+            </DialogActions>
+          </Dialog>
+        </Box>
+      )}
     </Box>
   );
 };

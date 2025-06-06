@@ -52,8 +52,8 @@ const Analytics = () => {
 
       console.log('API Responses:', { taskRes, sentEmailsRes, repliedEmailsRes, memberRes }); // Log all responses
 
-      // Fetch ML predictions separately from the Flask API
-      const mlPredictionsRes = await axios.get('http://localhost:5001/predictions').catch(err => { console.error('ML Predictions API Error:', err); return null; });
+      // Fetch ML predictions from the backend API
+      const mlPredictionsRes = await api.get('/api/ml/predictions').catch(err => { console.error('ML Predictions API Error:', err); return null; });
       console.log('ML Predictions Response:', mlPredictionsRes);
 
       // Format Task Completion Data

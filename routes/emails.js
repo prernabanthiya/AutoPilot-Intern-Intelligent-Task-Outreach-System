@@ -5,7 +5,7 @@ const db = require('../db'); // Assuming your database connection is in ../db
 
 // POST endpoint to send email
 router.post('/send', async (req, res) => {
-  const { memberId, groupId, subject, body } = req.body;
+  const { memberId, groupId, subject, body, taskId } = req.body;
 
   if (!subject || !body) {
     return res.status(400).json({ error: 'Subject and body are required' });
@@ -47,8 +47,34 @@ router.post('/send', async (req, res) => {
         return res.status(400).json({ error: 'No valid recipients found' });
     }
 
-    // Send the email using the email service, passing memberId(s) for logging
-    await sendEmail({ to: recipients, subject, body, memberId: recipientMemberIds });
+    // If taskId is provided, verify it exists and get task details
+    let taskDetails = null;
+    if (taskId) {
+      const taskResult = await db.query(
+        'SELECT t.*, m.email FROM tasks t JOIN members m ON t.member_id = m.id WHERE t.id = $1',
+        [taskId]
+      );
+      
+      if (taskResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+      
+      taskDetails = taskResult.rows[0];
+      
+      // Verify the recipient email matches the task's assigned member
+      if (recipients[0] !== taskDetails.email) {
+        return res.status(400).json({ error: 'Email recipient does not match task assignee' });
+      }
+    }
+
+    // Send the email with task completion button if taskId is provided
+    await sendEmail({
+      to: recipients,
+      subject,
+      body,
+      memberId: recipientMemberIds,
+      taskId: taskId || null // Pass taskId to include completion button
+    });
 
     res.status(200).json({ message: 'Email(s) sent successfully' });
 

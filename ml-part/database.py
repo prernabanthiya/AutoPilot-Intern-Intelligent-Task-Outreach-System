@@ -29,7 +29,7 @@ def fetch_data(conn):
         t.deadline,
         t.created_at AS task_created_at,
         el.sent_at,
-        r.reply_text,
+        r.content as reply_text,
         r.reply_classification,
         r.received_at
     FROM members m

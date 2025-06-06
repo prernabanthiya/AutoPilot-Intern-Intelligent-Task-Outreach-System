@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const db = require('./db'); // Assuming your database connection is in ./db
+// const { sendSlackMessage } = require('./slackService'); // Removed Slack import
 
 // Load environment variables
 require('dotenv').config();
@@ -18,49 +19,74 @@ const transporter = nodemailer.createTransport({
  * @param {object} params - Email parameters
  * @param {string|string[]} params.to - Recipient email address(es)
  * @param {string} params.subject - Email subject
- * @param {string} params.body - Email body
+ * @param {string} params.body - Email body (plain text)
  * @param {UUID|UUID[]} [params.memberId] - Optional member ID(s) for logging (UUID)
- * @param {UUID|null} [params.taskId=null] - Optional task ID for logging (UUID)
- * @returns {Promise<object>}
+ * @param {UUID|null} [params.taskId=null] - Optional task ID for task completion button (UUID)
  */
 const sendEmail = async ({ to, subject, body, memberId = null, taskId = null }) => {
-  if (!to || !subject || !body) {
-    throw new Error('To, subject, and body are required');
-  }
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER, // Sender address
-    to: to, // Recipient email address(es)
-    subject: subject, // Subject line
-    text: body, // Plain text body
-    // html: '<p>HTML body</p>' // HTML body (optional)
-  };
-
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent: %s', info.messageId);
+    // Generate task completion link if taskId is provided and BACKEND_URL is set
+    const completionLink = taskId && process.env.BACKEND_URL
+      ? `${process.env.BACKEND_URL}/api/tasks/complete/${taskId}`
+      : null;
 
-    // Log the email(s) in the database
-    const memberIdsToLog = Array.isArray(memberId) ? memberId : (memberId ? [memberId] : []);
+    let htmlBody = `
+      <p>${body.replace(/\n/g, '<br>')}</p>
+    `;
 
-    if (memberIdsToLog.length > 0) {
-        const query = 'INSERT INTO email_logs (member_id, task_id, subject, sent_at, status) VALUES ($1, $2, $3, NOW(), $4)';
-        for (const id of memberIdsToLog) {
-             // Ensure the member_id is a valid UUID if necessary, depending on your DB schema
-             // For now, assuming the passed memberId(s) are correct
-            await db.query(query, [id, taskId, subject, 'sent']);
-        }
-    } else if (taskId) {
-        // Fallback logging if only taskId is provided (less common for general emails)
-         const query = 'INSERT INTO email_logs (task_id, subject, sent_at, status) VALUES ($1, $2, NOW(), $3)';
-         await db.query(query, [taskId, subject, 'sent']);
+    if (completionLink) {
+      htmlBody += `
+        <p>Click the button below to mark this task as done:</p>
+        <a href="${completionLink}" target="_blank" style="
+          display: inline-block;
+          background-color: #4CAF50; /* Green background */
+          color: white; /* White text */
+          padding: 10px 20px; /* Some padding */
+          text-align: center; /* Centered text */
+          text-decoration: none; /* Remove underline */
+          border-radius: 5px; /* Rounded corners */
+          font-weight: bold; /* Bold text */
+          cursor: pointer;
+        ">
+          Mark Task as Done
+        </a>
+      `;
     }
 
-    return info;
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: Array.isArray(to) ? to.join(', ') : to,
+      subject,
+      html: htmlBody,
+    };
+
+    // Send email
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Email sent:', info.messageId);
+
+    // Log email in database if memberId is provided
+    if (memberId) {
+        const recipientMemberIds = Array.isArray(memberId) ? memberId : [memberId];
+
+        for (const id of recipientMemberIds) {
+          await db.query(
+            'INSERT INTO email_logs (member_id, subject, task_id, status) VALUES ($1, $2, $3, $4)',
+            [id, subject, taskId, 'sent']
+          );
+        }
+    }
+
   } catch (error) {
-    console.error('Error sending email:', error);
-    throw error; // Re-throw the error to be handled by the caller
+    console.error('Error sending or logging email:', error);
+    throw error; // Re-throw to be caught by the calling route
   }
 };
 
-module.exports = { sendEmail }; 
+// Removed inbound email processing logic
+// const processEmailNotification = async (event) => { /* ... */ };
+// const extractTaskIdFromEmail = (emailContent) => { /* ... */ };
+
+module.exports = {
+  sendEmail,
+  // sendSlackMessage, // Removed as inbound processing is no longer via Slack
+}; 
